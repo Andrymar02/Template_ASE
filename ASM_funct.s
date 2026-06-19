@@ -39,12 +39,12 @@
 ;      STRB    r1, [r0, #3]      ; scrive buffer[3] = 0xFF
 ;
 ; 4. Offset per array:
-;      - Array di byte: usa direttamente l’indice
-;      - Array di word (uint32_t): moltiplica l’indice per 4
+;      - Array di byte: usa direttamente lï¿½indice
+;      - Array di word (uint32_t): moltiplica lï¿½indice per 4
 ;        esempio: LDR r2, [r0, r3, LSL #2] ; r3 = indice
 ;
 ; 5. Registri extra:
-;      - Se servono più registri di quelli standard (r0-r3), salvare e ripristinare
+;      - Se servono piï¿½ registri di quelli standard (r0-r3), salvare e ripristinare
 ;        registri non volatili (r4-r11) usando lo stack:
 ;           PUSH {r4-r7, lr}
 ;           ... codice ...
@@ -60,14 +60,14 @@
 ; ============================================================================
 ; 1. Registri utilizzati per gli argomenti:
 ;      - r0, r1, r2, r3 sono usati per i primi 4 argomenti.
-;      - Se ci sono più di 4 argomenti, i successivi vanno nello stack.
+;      - Se ci sono piï¿½ di 4 argomenti, i successivi vanno nello stack.
 ;
 ; 2. Tipi comuni:
 ;      - int, uint32_t, puntatori -> r0, r1, r2, r3
 ;      - float/double -> passati in r0-r1 (float singolo) o su stack (double)
 ;
 ; 3. Lettura / scrittura degli argomenti:
-;      - Il primo argomento della funzione è in r0
+;      - Il primo argomento della funzione ï¿½ in r0
 ;      - Il secondo argomento in r1, il terzo in r2, il quarto in r3
 ;
 ; 4. Esempio:
@@ -121,11 +121,60 @@
 ;      ENDP
 ;
 ; Nota:
-;  - Puntatore all'array è sempre in r0
+;  - Puntatore all'array ï¿½ sempre in r0
 ;  - Per leggere arr[i] si usa: LDR rX, [r0, r3, LSL #2]
-;    LSL #2 perché gli elementi sono word (4 byte)
+;    LSL #2 perchï¿½ gli elementi sono word (4 byte)
 			
 
+; ============================================================================
+; 1. TEMPLATE UNIVERSALE DA ESAME
+; ============================================================================
+; Copia e incolla questo blocco e rinominalo per iniziare a scrivere la funzione 
+; richiesta dalla traccia.
+; ============================================================================
+        EXPORT template_universale
+        ALIGN
+
+template_universale
+    ; 1. PROLOGO (Salvaguardia dei registri R4-R11 e Link Register)
+    PUSH {R4-R11, LR}
+
+    ; 2. RECUPERO PARAMETRI EXTRA (Se hai 5 o piÃ¹ parametri)
+    ; LDR R4, [SP, #36]       ; Carica in R4 il quinto parametro
+
+    ; 3. INIZIALIZZAZIONE VARIABILI
+    ; R0 = Indirizzo Array, R1 = Dimensione (N)
+    MOV R5, #0              ; R5 farÃ  da indice per il ciclo (i = 0)
+    MOV R6, #0              ; R6 farÃ  da accumulatore/contatore
+
+loop_start
+    ; 4. CONDIZIONE DI FINE CICLO
+    CMP R5, R1              ; Confronta indice (R5) con dimensione (R1)
+    BGE loop_end            ; Se i >= N, esci dal ciclo
+
+    ; 5. LETTURA DAL VETTORE (Scegli quella giusta!)
+    LDR  R7, [R0], #4       ; Per vettori a 32-bit (int, unsigned int)
+    ; LDRB R7, [R0], #1     ; Per vettori a 8-bit (char, unsigned char)
+
+    ; 6. LOGICA E OTTIMIZZAZIONE SENZA SALTI (IT Block)
+    CMP R7, R3              ; Confronta elemento letto (R7) con parametro K (R3)
+    IT GT                   ; If Greater Than...
+    ADDGT R6, R6, #1        ; ...esegui l'addizione
+
+    ; 7. INCREMENTO E RIPETIZIONE
+    ADD R5, R5, #1          ; Incremento il contatore del ciclo (i++)
+    B loop_start            
+
+loop_end
+    ; 8. AGGIORNAMENTO PARAMETRI PER RIFERIMENTO (Puntatori)
+    ; STRB R6, [R2]         ; Esempio: Salva un byte (8-bit) in un puntatore char* passato in R2
+
+    ; 9. RITORNO AL C
+    MOV R0, R6              ; Sposta il risultato principale in R0
+
+    ; 10. EPILOGO
+    POP {R4-R11, PC}
+    
 ; ----------------------------------------------------------------------------
 ; Function: compress
 ; Descrizione: Calcola le differenze tra elementi adiacenti.
@@ -371,9 +420,9 @@ loop_upper LDRB r2, [r1]            ; Leggi carattere
         CMP     r2, #0              ; Fine stringa?
         BEQ     end_upper
         
-        CMP     r2, #'a'            ; Se < 'a', non è minuscolo
+        CMP     r2, #'a'            ; Se < 'a', non ï¿½ minuscolo
         BLT     skip_upper
-        CMP     r2, #'z'            ; Se > 'z', non è minuscolo
+        CMP     r2, #'z'            ; Se > 'z', non ï¿½ minuscolo
         BGT     skip_upper
         
         SUB     r2, r2, #32         ; Converti: 'a'(97) - 32 = 'A'(65)
@@ -410,7 +459,7 @@ end_bits POP    {r4, pc}
 
 ; ----------------------------------------------------------------------------
 ; Function: check_palindrome
-; Descrizione: Verifica se una stringa è palindroma.
+; Descrizione: Verifica se una stringa ï¿½ palindroma.
 ; Input:  R0 = Stringa, R1 = Lunghezza
 ; Output: R0 = 1 (Vero), 0 (Falso)
 ; ----------------------------------------------------------------------------
@@ -478,7 +527,7 @@ loop_atoi LDRB  r2, [r1], #1
         
         SUB     r2, r2, #'0'    ; ASCII to Int
         CMP     r2, #9          
-        BHI     end_atoi        ; Se non è cifra, stop
+        BHI     end_atoi        ; Se non ï¿½ cifra, stop
         
         MUL     r0, r0, r3      ; Acc * 10
         ADD     r0, r0, r2      ; Acc + Cifra
@@ -596,7 +645,7 @@ exitMin MOV R0, R6
 		ENDP
 
 ; -------------------------------------------------------------------
-; Verifica se array è monotono crescente
+; Verifica se array ï¿½ monotono crescente
 ; Input: R0 = puntatore array, R1 = dimensione
 ; Output: R0 = 1 se vero, 0 se falso
 ; -------------------------------------------------------------------
@@ -651,7 +700,7 @@ noOverflow LDMFD sp!,{r4-r8,r10-r11,pc}
 		ENDP
 
 ; -------------------------------------------------------------------
-; Verifica se un valore è in un intervallo
+; Verifica se un valore ï¿½ in un intervallo
 ; Input: R0 = valore, R1 = min, R2 = max
 ; Output: R0 = 1 se in range, 0 altrimenti
 ; -------------------------------------------------------------------
@@ -808,7 +857,7 @@ exitMin_1 MOV R0, R6
 		ENDP
 
 ; -------------------------------------------------------------------
-; Verifica se array è monotono crescente
+; Verifica se array ï¿½ monotono crescente
 ; Input: R0 = puntatore array, R1 = dimensione
 ; Output: R0 = 1 se vero, 0 se falso
 ; -------------------------------------------------------------------
@@ -871,7 +920,7 @@ is_prime PROC
 loop_prime
         MUL R2, R1, R1
         CMP R2, R0
-        BGT prime_yes         ; se R1*R1 > N, è primo
+        BGT prime_yes         ; se R1*R1 > N, ï¿½ primo
         UDIV R3, R0, R1
         MUL R3, R3, R1
         CMP R3, R0
