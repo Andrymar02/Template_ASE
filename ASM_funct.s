@@ -132,49 +132,104 @@
 ; Copia e incolla questo blocco e rinominalo per iniziare a scrivere la funzione 
 ; richiesta dalla traccia.
 ; ============================================================================
-        EXPORT template_universale
-        ALIGN
+        EXPORT nome_funzione_esame
+nome_funzione_esame PROC
 
-template_universale
-    ; 1. PROLOGO (Salvaguardia dei registri R4-R11 e Link Register)
+    ; =========================================================================
+        ; 1. PROLOGO (Salvaguardia dei registri)
+    ; =========================================================================
+    ; Salvo i registri "callee-saved" (R4-R11) e il Link Register (LR) nello stack.
+    ; Lo standard AAPCS impone che, se usi R4-R11, devi riportarli come li hai trovati.
     PUSH {R4-R11, LR}
 
-    ; 2. RECUPERO PARAMETRI EXTRA (Se hai 5 o più parametri)
-    ; LDR R4, [SP, #36]       ; Carica in R4 il quinto parametro
+    ; =========================================================================
+    ; 2. RECUPERO PARAMETRI EXTRA (Dal 5° in poi)
+    ; =========================================================================
+    ; I primi 4 parametri del C sono GIA' in R0, R1, R2, R3.
+    ; Se hai 5 o più parametri, il C li ha messi nello stack.
+    ; Calcolo dell'offset: ho pushato 9 registri (da R4 a R11 + LR) = 9 * 4 byte = 36 byte.
+    LDR R4, [SP, #36]       ; Carica in R4 il quinto parametro
+    ; LDR R5, [SP, #40]     ; Eventuale sesto parametro, ecc.
 
+    ; =========================================================================
     ; 3. INIZIALIZZAZIONE VARIABILI
-    ; R0 = Indirizzo Array, R1 = Dimensione (N)
-    MOV R5, #0              ; R5 farà da indice per il ciclo (i = 0)
-    MOV R6, #0              ; R6 farà da accumulatore/contatore
+    ; =========================================================================
+    ; Assumiamo che R0 = indirizzo VETT, R1 = dimensione (N), R2 = puntatore a flag
+    MOV R5, #0              ; R5 farà da contatore per il ciclo (i = 0)
+    MOV R6, #0              ; R6 farà da accumulatore/contatore per i risultati
 
 loop_start
+    ; =========================================================================
     ; 4. CONDIZIONE DI FINE CICLO
-    CMP R5, R1              ; Confronta indice (R5) con dimensione (R1)
-    BGE loop_end            ; Se i >= N, esci dal ciclo
+    ; =========================================================================
+    CMP R5, R1              ; Confronta indice 'i' (R5) con la dimensione 'N' (R1)
+    BGE loop_end            ; Branch if Greater or Equal: se i >= N, esci dal ciclo
 
-    ; 5. LETTURA DAL VETTORE (Scegli quella giusta!)
-    LDR  R7, [R0], #4       ; Per vettori a 32-bit (int, unsigned int)
-    ; LDRB R7, [R0], #1     ; Per vettori a 8-bit (char, unsigned char)
+    ; =========================================================================
+    ; 5. LETTURA DAL VETTORE (Scegli quella corretta ed elimina le altre)
+    ; =========================================================================
+    ; --- DATI A 32 BIT (uint32_t o int32_t) ---
+    ; Nessuna estensione necessaria, occupano già tutto il registro.
+    LDR   R7, [R0], #4      ; Uguale per con segno e senza segno
 
-    ; 6. LOGICA E OTTIMIZZAZIONE SENZA SALTI (IT Block)
-    CMP R7, R3              ; Confronta elemento letto (R7) con parametro K (R3)
-    IT GT                   ; If Greater Than...
-    ADDGT R6, R6, #1        ; ...esegui l'addizione
+    ; --- DATI A 16 BIT (Half-Word, 2 byte) ---
+    ; LDRH R7, [R0], #2     ; [Senza Segno] (uint16_t, unsigned short) - Zero Extension
+    ; LDRSH R7, [R0], #2    ; [Con Segno]   (int16_t, short) - Sign Extension
 
+    ; --- DATI A 8 BIT (Byte, 1 byte) ---
+    ; LDRB R7, [R0], #1     ; [Senza Segno] (uint8_t, unsigned char, char*) - Zero Extension
+    ; LDRSB R7, [R0], #1    ; [Con Segno]   (int8_t, char numerico) - Sign Extension
+
+    ; =========================================================================
+    ; 6. LOGICA E OTTIMIZZAZIONE (IT Block)
+    ; =========================================================================
+    ; Esempio: voglio incrementare il mio accumulatore (R6) SOLO SE 
+    ; l'elemento letto (R7) è maggiore del limite che ho in R3.
+    CMP R7, R3              ; Confronto elemento letto con limite
+    IT GT                   ; (I)f (T)hen per la condizione (G)reater (T)han
+    ADDGT R6, R6, #1        ; Se la CMP era GT, allora esegui l'addizione. No salti!
+
+    ; =========================================================================
+    ; SCRITTURA IN MEMORIA (Nessuna distinzione di segno)
+    ; =========================================================================
+    STR   R7, [R0]          ; Scrive 32 bit
+    STRH  R7, [R0]          ; Scrive i 16 bit più bassi di R7
+    STRB  R7, [R0]          ; Scrive gli 8 bit più bassi di R7
+
+    ; =========================================================================
     ; 7. INCREMENTO E RIPETIZIONE
+    ; =========================================================================
     ADD R5, R5, #1          ; Incremento il contatore del ciclo (i++)
-    B loop_start            
+    B loop_start            ; Salto incondizionato all'inizio del ciclo
+
+
 
 loop_end
+    ; =========================================================================
     ; 8. AGGIORNAMENTO PARAMETRI PER RIFERIMENTO (Puntatori)
-    ; STRB R6, [R2]         ; Esempio: Salva un byte (8-bit) in un puntatore char* passato in R2
+    ; =========================================================================
+    ; Supponiamo che R2 contenga l'indirizzo di memoria di un flag da restituire.
+    ; Prima calcoliamo o prepariamo il valore (es. lo forziamo a 1 in R8)
+    MOV R8, #1              
+    STRB R8, [R2]           ; Salva il byte (R8) all'indirizzo puntato da R2 (es: char* flag)
+    ; STR R8, [R2]          ; Usare STR "normale" se il puntatore è int* (32 bit)
 
-    ; 9. RITORNO AL C
-    MOV R0, R6              ; Sposta il risultato principale in R0
+    ; =========================================================================
+    ; 9. PREPARAZIONE DEL VALORE DI RITORNO PRINCIPALE
+    ; =========================================================================
+    ; Il C si aspetta SEMPRE il return della funzione in R0.
+    MOV R0, R6              ; Sposto il risultato finale (R6) in R0
 
+    ; =========================================================================
     ; 10. EPILOGO
-    POP {R4-R11, PC}
-    
+    ; =========================================================================
+    ; Ripristino i registri salvati all'inizio.
+    ; Facendo la POP di PC (Program Counter) invece che di LR, 
+    ; forzo il processore a tornare direttamente alla funzione C chiamante.
+    POP {R4-R11, PC}        
+    END    
+
+
 ; ----------------------------------------------------------------------------
 ; Function: compress
 ; Descrizione: Calcola le differenze tra elementi adiacenti.
